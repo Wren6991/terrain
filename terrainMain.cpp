@@ -19,6 +19,7 @@
 //*)
 
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
+int seed = 1338;
 
 //helper functions
 enum wxbuildinfoformat {
@@ -78,7 +79,7 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     	WX_GL_STENCIL_SIZE,    0,
     	0, 0 };
     GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
-    GLCanvas1->SetMinSize(wxSize(480,480));
+    GLCanvas1->SetMinSize(wxSize(1024,1024));
     BoxSizer1->Add(GLCanvas1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
     SetSizer(BoxSizer1);
     MenuBar1 = new wxMenuBar();
@@ -115,10 +116,10 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     //*)
     GLContext  = new wxGLContext(GLCanvas1);
     pitch = 0;
-    yaw = 0;
-    camx = 0;
-    camy = 0;
-    camz = 0;
+    yaw = -PI / 4;
+    camx = 10;
+    camy = 20;
+    camz = -10;
     lastmousex = 0;
     lastmousey = 0;
 }
@@ -130,7 +131,7 @@ inline double max(double a, double b)
 
 double noise(double x)
 {
-    srand(pow(x, 1.12) * 61 - 1321);
+    srand(pow(x, 1.12) * 61 - 1321 + seed);
     rand();
     return rand() / (double)RAND_MAX;
     //return noisetexture[int((x - floor(x / 100) * 100) * 100 + y - floor(y / 100) * 100)];
@@ -167,7 +168,7 @@ double fbm(double x, double y, int octaves, double frequency, double persistence
 
 inline double voronoi(double x, double y, int gridsize, int npoints)
 {
-    srand(12345678);
+    srand(seed * seed);
     double minsqrdist = 100;
     double px, py, sqrdist;
     for (int i = 0; i < npoints; i++)
@@ -208,8 +209,10 @@ void terrainFrame::initgl()
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     glEnable(GL_COLOR_MATERIAL);
+    glEnable (GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glViewport(0, 0, 480, 480);
+    glViewport(0, 0, 1024, 1024);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glFrustum(-1, 1, -1, 1, 1, 1000);
@@ -250,7 +253,7 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     glEnd();
 
 
-    int gridsize = 70;
+    int gridsize = 150;
     double** grid = new double*[gridsize + 2];
     for (int i = 0; i < gridsize + 2; i++)
         grid[i] = new double[gridsize + 2];
@@ -258,85 +261,10 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     {
         for(int j = 0; j < gridsize; j++)
         {
-//            grid[i][j] = max(voronoi(i, j, 100, 100) + fbm(i / 8.0, j / 8.0, 4, 2, 0.5) * 5 - 4, 5);
-            grid[i][j] = voronoi(i, j, 100, 100);
+            grid[i][j] = (voronoi(i, j, gridsize, 500) + fbm(i / 8.0, j / 8.0, 4, 2, 0.5) * 5 - 3) * 0.7;
         }
     }
-    srand(123478);
-    int nitrs = tick << 3;
-    for (int i = 0; i < 10000; i++)
-    {
 
-        int x, y;
-        x = rand() % gridsize + 1;
-        y = rand() % gridsize + 1;
-        while(true)
-        {
-            float mindiff = 0;
-            float diff = grid[x + 1][y] - grid[x][y];
-            int dir;
-            if (diff < mindiff)
-            {
-                mindiff = diff;
-                dir = 0;
-            }
-            diff = grid[x][y + 1] - grid[x][y];
-            if (diff < mindiff)
-            {
-                mindiff = diff;
-                dir = 1;
-            }
-            diff = grid[x - 1][y] - grid[x][y];
-            if (diff < mindiff)
-            {
-                mindiff = diff;
-                dir = 2;
-            }
-            diff = grid[x][y - 1] - grid[x][y];
-            if (diff < mindiff)
-            {
-                mindiff = diff;
-                dir = 3;
-            }
-            if (mindiff < 0)
-            {
-                grid[x][y] += max(mindiff, -0.1);
-                switch(dir)
-                {
-                    case 0:
-                        x++;
-                        break;
-                    case 1:
-                        y++;
-                        break;
-                    case 2:
-                        x--;
-                        break;
-                    case 3:
-                        y--;
-                        break;
-
-                }
-                x = x % gridsize + 1;
-                y = y % gridsize + 1;
-                //grid[x][y] -= mindiff * 0.1;
-                //std::cout << "x: " << x << ", y: " << y << "\n";
-                //std::cout << "<<<<  " << i << "  >>>>\n";
-            }
-            else
-            {
-                grid[x][y] +=  0.2;
-                break;
-            }
-        }
-    }
-    for (int i = 0; i < gridsize + 2; i++)
-    {
-        for (int j = 0; j < gridsize + 2; j++)
-        {
-            grid[i][j] = max(grid[i][j], 5);
-        }
-    }
     vec3** normals = new vec3*[gridsize];
     for (int i = 0; i < gridsize; i++)
         normals[i] = new vec3[gridsize];
@@ -354,31 +282,39 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
             glBegin(GL_POLYGON);
             glNormal3f(    normals[i    ][j    ].x, normals[i    ][j    ].y, normals[i    ][j    ].z);
             if (grid[i    ][j    ] <= 5)
-                glColor3f(0.1, 0.1, 0.6);
+                glColor3f(0.8, 0.7, 0.3);
             else
-                glColor3f(0.1, 0.8, 0.1);
+                glColor3f(0.2, 0.7, 0.1);
             glVertex3f(i    , grid[i    ][j    ], -j    );
             glNormal3f(    normals[i    ][j + 1].x, normals[i    ][j + 1].y, normals[i    ][j + 1].z);
             if (grid[i    ][j + 1] <= 5)
-                glColor3f(0.1, 0.1, 0.6);
+                glColor3f(0.8, 0.7, 0.3);
             else
-                glColor3f(0.1, 0.8, 0.1);
+                glColor3f(0.2, 0.7, 0.1);
             glVertex3f(i    , grid[i    ][j + 1], -j - 1);
             glNormal3f(    normals[i + 1][j + 1].x, normals[i + 1][j + 1].y, normals[i + 1][j + 1].z);
             if (grid[i + 1][j + 1] <= 5)
-                glColor3f(0.1, 0.1, 0.6);
+                glColor3f(0.8, 0.7, 0.3);
             else
-                glColor3f(0.1, 0.8, 0.1);
+                glColor3f(0.2, 0.7, 0.1);
             glVertex3f(i + 1, grid[i + 1][j + 1], -j - 1);
             glNormal3f(    normals[i + 1][j    ].x, normals[i + 1][j    ].y, normals[i + 1][j    ].z);
             if (grid[i + 1][j    ] <= 5)
-                glColor3f(0.1, 0.1, 0.6);
+                glColor3f(0.8, 0.7, 0.3);
             else
-                glColor3f(0.1, 0.8, 0.1);
+                glColor3f(0.2, 0.7, 0.1);
             glVertex3f(i + 1, grid[i + 1][j    ], -j    );
             glEnd();
         }
     }
+    glBegin(GL_POLYGON);
+    glColor4f(0, 0.1, 0.7, 0.7);
+    glNormal3f(0, -1, 0);
+    glVertex3f(0, 4.5, 0);
+    glVertex3f(0, 4.5, -gridsize);
+    glVertex3f(gridsize, 4.5, -gridsize);
+    glVertex3f(gridsize, 4.5, 0);
+    glEnd();
     endgl();
     for (int i = 0; i < gridsize + 2; i++)
         delete grid[i];
