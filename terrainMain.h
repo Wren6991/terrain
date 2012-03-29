@@ -49,10 +49,13 @@ class terrainFrame: public wxFrame
         void OnGLCanvas1KeyDown(wxKeyEvent& event);
         void OnGLCanvas1RightDown(wxMouseEvent& event);
         void OnGLCanvas1RightUp(wxMouseEvent& event);
+        void OnGLCanvas1RightDClick(wxMouseEvent& event);
+        void OnMenuItem3Selected(wxCommandEvent& event);
         //*)
 
         //(*Identifiers(terrainFrame)
         static const long ID_GLCANVAS1;
+        static const long ExportTGA;
         static const long idMenuQuit;
         static const long idMenuAbout;
         static const long ID_STATUSBAR1;
@@ -62,6 +65,7 @@ class terrainFrame: public wxFrame
         wxGLContext *GLContext;
         //(*Declarations(terrainFrame)
         wxGLCanvas* GLCanvas1;
+        wxMenuItem* MenuItem3;
         wxStatusBar* StatusBar1;
         wxTimer Timer1;
         //*)

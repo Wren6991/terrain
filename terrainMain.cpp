@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include "vec3.h"
 #include <iostream>
+#include <fstream>
 
 //(*InternalHeaders(terrainFrame)
 #include <wx/intl.h>
@@ -19,7 +20,6 @@
 //*)
 
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
-int seed = 1338;
 
 //helper functions
 enum wxbuildinfoformat {
@@ -49,6 +49,7 @@ wxString wxbuildinfo(wxbuildinfoformat format)
 
 //(*IdInit(terrainFrame)
 const long terrainFrame::ID_GLCANVAS1 = wxNewId();
+const long terrainFrame::ExportTGA = wxNewId();
 const long terrainFrame::idMenuQuit = wxNewId();
 const long terrainFrame::idMenuAbout = wxNewId();
 const long terrainFrame::ID_STATUSBAR1 = wxNewId();
@@ -59,6 +60,7 @@ BEGIN_EVENT_TABLE(terrainFrame,wxFrame)
     //(*EventTable(terrainFrame)
     //*)
 END_EVENT_TABLE()
+
 
 terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
 {
@@ -79,11 +81,13 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     	WX_GL_STENCIL_SIZE,    0,
     	0, 0 };
     GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
-    GLCanvas1->SetMinSize(wxSize(1024,1024));
+    GLCanvas1->SetMinSize(wxSize(640,640));
     BoxSizer1->Add(GLCanvas1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
     SetSizer(BoxSizer1);
     MenuBar1 = new wxMenuBar();
     Menu1 = new wxMenu();
+    MenuItem3 = new wxMenuItem(Menu1, ExportTGA, _("&Export TGA"), wxEmptyString, wxITEM_NORMAL);
+    Menu1->Append(MenuItem3);
     MenuItem1 = new wxMenuItem(Menu1, idMenuQuit, _("Quit\tAlt-F4"), _("Quit the application"), wxITEM_NORMAL);
     Menu1->Append(MenuItem1);
     MenuBar1->Append(Menu1, _("&File"));
@@ -108,8 +112,10 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     GLCanvas1->Connect(wxEVT_LEFT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1LeftUp,0,this);
     GLCanvas1->Connect(wxEVT_RIGHT_DOWN,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDown,0,this);
     GLCanvas1->Connect(wxEVT_RIGHT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightUp,0,this);
+    GLCanvas1->Connect(wxEVT_RIGHT_DCLICK,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDClick,0,this);
     GLCanvas1->Connect(wxEVT_MOTION,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseMove,0,this);
     GLCanvas1->Connect(wxEVT_LEAVE_WINDOW,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseLeave,0,this);
+    Connect(ExportTGA,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnMenuItem3Selected);
     Connect(idMenuQuit,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnQuit);
     Connect(idMenuAbout,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnAbout);
     Connect(ID_TIMER1,wxEVT_TIMER,(wxObjectEventFunction)&terrainFrame::OnTimer1Trigger);
@@ -129,16 +135,16 @@ inline double max(double a, double b)
     return a > b ? a : b;
 }
 
-double noise(double x)
+double noise(double x, int seed)
 {
     srand(pow(x, 1.12) * 61 - 1321 + seed);
     rand();
     return rand() / (double)RAND_MAX;
     //return noisetexture[int((x - floor(x / 100) * 100) * 100 + y - floor(y / 100) * 100)];
 }
-inline double noise(double x, double y)
+inline double noise(double x, double y, int seed)
 {
-    return noise(noise(x) * 1000 + noise(y * 12) * 877);
+    return noise(noise(x, seed) * 1000 + noise(y * 12, seed) * 877, seed);
 }
 
 inline double lerp(double a, double b, double t)
@@ -149,24 +155,24 @@ inline double frac(double x)
 {
     return x - floor(x);
 }
-inline double smoothnoise(double x, double y)
+inline double smoothnoise(double x, double y, int seed)
 {
     return lerp(
-                lerp(noise(floor(x), floor(y)    ), noise(floor(x) + 1, floor(y)    ), frac(x)),
-                lerp(noise(floor(x), floor(y) + 1), noise(floor(x) + 1, floor(y) + 1), frac(x)),
+                lerp(noise(floor(x), floor(y)    , seed), noise(floor(x) + 1, floor(y)    , seed), frac(x)),
+                lerp(noise(floor(x), floor(y) + 1, seed), noise(floor(x) + 1, floor(y) + 1, seed), frac(x)),
                 frac(y)
                 );
 }
 
-double fbm(double x, double y, int octaves, double frequency, double persistence)
+double fbm(double x, double y, int octaves, double frequency, double persistence, int seed)
 {
     if (octaves > 0)
-        return smoothnoise(x, y) + persistence * fbm(x * frequency, y * frequency, octaves - 1, frequency, persistence);
+        return smoothnoise(x, y, seed) + persistence * fbm(x * frequency, y * frequency, octaves - 1, frequency, persistence, seed);
     else
         return 0;
 }
 
-inline double voronoi(double x, double y, int gridsize, int npoints)
+inline double voronoi(double x, double y, int gridsize, int npoints, int seed)
 {
     srand(seed * seed);
     double minsqrdist = 100;
@@ -212,7 +218,7 @@ void terrainFrame::initgl()
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glViewport(0, 0, 1024, 1024);
+    glViewport(0, 0, 640, 640);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glFrustum(-1, 1, -1, 1, 1, 1000);
@@ -261,7 +267,7 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     {
         for(int j = 0; j < gridsize; j++)
         {
-            grid[i][j] = (voronoi(i, j, gridsize, 500) + fbm(i / 8.0, j / 8.0, 4, 2, 0.5) * 5 - 3) * 0.7;
+            grid[i][j] =  + fbm(i / 16.0 + smoothnoise(i * 0.2, j * 0.2, 1338) * 0.8, j / 16.0 + smoothnoise(i * 0.2, j * 0.2, 1338 + 1) * 0.8, 5, 2, 0.4, 1338) * 10 - 4;
         }
     }
 
@@ -381,4 +387,60 @@ void terrainFrame::OnGLCanvas1RightDown(wxMouseEvent& event)
 void terrainFrame::OnGLCanvas1RightUp(wxMouseEvent& event)
 {
     mousedownr = false;
+}
+
+void terrainFrame::OnGLCanvas1RightDClick(wxMouseEvent& event)
+{
+
+}
+
+void terrainFrame::OnMenuItem3Selected(wxCommandEvent& event)
+{
+    int gridsize = 150;
+    double** grid = new double*[gridsize + 2];
+    for (int i = 0; i < gridsize + 2; i++)
+        grid[i] = new double[gridsize + 2];
+    for (int i = 0; i < gridsize; i++)
+    {
+        for(int j = 0; j < gridsize; j++)
+        {
+            grid[i][j] =  + fbm(i / 16.0 + smoothnoise(i * 0.2, j * 0.2, 1338) * 0.8, j / 16.0 + smoothnoise(i * 0.2, j * 0.2, 1338 + 1) * 0.8, 5, 2, 0.4, 1338) * 10 - 4;
+        }
+    }
+    std::ofstream ofile;
+    ofile.open("C:\\Users\\Owner\\Documents\\heightmap.tga", std::ios::binary | std::ios::out);
+    unsigned char c = 0;
+    ofile << c;
+    ofile << c;
+    c = 2;
+    ofile << c;
+    c = 0;
+    ofile << c << c;
+    ofile << c << c;
+    ofile << c;
+    ofile << c << c;
+    ofile << c << c;
+    c = gridsize & 0x00ff;
+    ofile << c;
+    c = (gridsize & 0xff00) >> 8;
+    ofile << c;
+    c = gridsize & 0x00ff;
+    ofile << c;
+    c = (gridsize & 0xff00) >> 8;
+    ofile << c;
+    c = 24;
+    ofile << c;
+    c = 0;
+    ofile << c;
+    for (int i = 0; i < gridsize; i++)
+    {
+        for (int j = 0; j < gridsize; j++)
+        {
+            c = grid[i][j] * 22 + 50;
+            ofile << c << c << c;
+        }
+    }
+    ofile << std::flush;
+    ofile.close();
+    wxMessageBox("LOL", _("Welcome to..."));
 }
