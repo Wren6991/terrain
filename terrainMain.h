@@ -10,6 +10,7 @@
 #ifndef TERRAINMAIN_H
 #define TERRAINMAIN_H
 
+#include <GL/glew.h>
 //(*Headers(terrainFrame)
 #include <wx/sizer.h>
 #include <wx/menu.h>
@@ -18,6 +19,8 @@
 #include <wx/timer.h>
 #include <wx/statusbr.h>
 //*)
+#define GL_GLEXT_PROTOTYPES
+
 
 class terrainFrame: public wxFrame
 {
@@ -31,6 +34,11 @@ class terrainFrame: public wxFrame
         double lastmousex, lastmousey;
         bool mousedownl;
         bool mousedownr;
+        struct
+        {
+            GLuint VBO;
+            GLuint IBO;
+        } resources;
 
     private:
 
