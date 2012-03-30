@@ -12,7 +12,7 @@
 #include <wx/msgdlg.h>
 #include <stdlib.h>
 #include "vec3.h"
-#include "vert.h"
+#include "util.h"
 #include <iostream>
 #include <fstream>
 #include <istream>
@@ -23,12 +23,11 @@
 //*)
 
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
-double **grid;
-vec3 **normals;
+
+int gridsize = 1000;
 
 #define BUFFER_OFFSET(i) (reinterpret_cast<void*>(i))
 
-int gridsize = 500;
 
 //helper functions
 enum wxbuildinfoformat {
@@ -61,7 +60,6 @@ const long terrainFrame::ID_GLCANVAS1 = wxNewId();
 const long terrainFrame::ExportTGA = wxNewId();
 const long terrainFrame::idMenuQuit = wxNewId();
 const long terrainFrame::idMenuAbout = wxNewId();
-const long terrainFrame::ID_STATUSBAR1 = wxNewId();
 const long terrainFrame::ID_TIMER1 = wxNewId();
 //*)
 
@@ -134,77 +132,9 @@ terrainFrame::~terrainFrame()
     //*)
 }
 
-
-terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
+void terrainFrame::generateTerrain()
 {
-    //(*Initialize(terrainFrame)
-    wxMenuItem* MenuItem2;
-    wxMenuItem* MenuItem1;
-    wxMenu* Menu1;
-    wxBoxSizer* BoxSizer1;
-    wxMenuBar* MenuBar1;
-    wxMenu* Menu2;
-
-    Create(parent, id, _("Terrain!"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, _T("id"));
-    BoxSizer1 = new wxBoxSizer(wxHORIZONTAL);
-    int GLCanvasAttributes_1[] = {
-    	WX_GL_RGBA,
-    	WX_GL_DOUBLEBUFFER,
-    	WX_GL_DEPTH_SIZE,      16,
-    	WX_GL_STENCIL_SIZE,    0,
-    	0, 0 };
-    GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
-    GLCanvas1->SetMinSize(wxSize(640,640));
-    BoxSizer1->Add(GLCanvas1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
-    SetSizer(BoxSizer1);
-    MenuBar1 = new wxMenuBar();
-    Menu1 = new wxMenu();
-    MenuItem3 = new wxMenuItem(Menu1, ExportTGA, _("&Export TGA"), wxEmptyString, wxITEM_NORMAL);
-    Menu1->Append(MenuItem3);
-    MenuItem1 = new wxMenuItem(Menu1, idMenuQuit, _("Quit\tAlt-F4"), _("Quit the application"), wxITEM_NORMAL);
-    Menu1->Append(MenuItem1);
-    MenuBar1->Append(Menu1, _("&File"));
-    Menu2 = new wxMenu();
-    MenuItem2 = new wxMenuItem(Menu2, idMenuAbout, _("About\tF1"), _("Show info about this application"), wxITEM_NORMAL);
-    Menu2->Append(MenuItem2);
-    MenuBar1->Append(Menu2, _("Help"));
-    SetMenuBar(MenuBar1);
-    StatusBar1 = new wxStatusBar(this, ID_STATUSBAR1, 0, _T("ID_STATUSBAR1"));
-    int __wxStatusBarWidths_1[1] = { -1 };
-    int __wxStatusBarStyles_1[1] = { wxSB_NORMAL };
-    StatusBar1->SetFieldsCount(1,__wxStatusBarWidths_1);
-    StatusBar1->SetStatusStyles(1,__wxStatusBarStyles_1);
-    SetStatusBar(StatusBar1);
-    Timer1.SetOwner(this, ID_TIMER1);
-    Timer1.Start(10, false);
-    BoxSizer1->Fit(this);
-    BoxSizer1->SetSizeHints(this);
-
-    GLCanvas1->Connect(wxEVT_PAINT,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1Paint,0,this);
-    GLCanvas1->Connect(wxEVT_LEFT_DOWN,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1LeftDown,0,this);
-    GLCanvas1->Connect(wxEVT_LEFT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1LeftUp,0,this);
-    GLCanvas1->Connect(wxEVT_RIGHT_DOWN,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDown,0,this);
-    GLCanvas1->Connect(wxEVT_RIGHT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightUp,0,this);
-    GLCanvas1->Connect(wxEVT_RIGHT_DCLICK,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDClick,0,this);
-    GLCanvas1->Connect(wxEVT_MOTION,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseMove,0,this);
-    GLCanvas1->Connect(wxEVT_LEAVE_WINDOW,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseLeave,0,this);
-    Connect(ExportTGA,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnMenuItem3Selected);
-    Connect(idMenuQuit,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnQuit);
-    Connect(idMenuAbout,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnAbout);
-    Connect(ID_TIMER1,wxEVT_TIMER,(wxObjectEventFunction)&terrainFrame::OnTimer1Trigger);
-    //*)
-    GLContext  = new wxGLContext(GLCanvas1);
-
-    pitch = 0;
-    yaw = 0;
-    camx = 10;
-    camy = 20;
-    camz = -10;
-    lastmousex = 0;
-    lastmousey = 0;
-
-
-    grid = new double*[gridsize + 2];
+        double **grid = new double*[gridsize + 2];
     for (int i = 0; i < gridsize + 2; i++)
         grid[i] = new double[gridsize + 2];
     for (int i = 0; i < gridsize + 2; i++)
@@ -215,7 +145,7 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
         }
     }
 
-    normals = new vec3*[gridsize];
+    vec3 **normals = new vec3*[gridsize];
     for (int i = 0; i < gridsize; i++)
         normals[i] = new vec3[gridsize];
     for (int i = 0; i < gridsize; i++)
@@ -269,13 +199,13 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     {
         for (int i = 0; i < (gridsize - 1); i++)
         {
-            indices[(i + j * (gridsize - 1)) * 6    ] = i + j * gridsize;                             //  0, 3 +----+ 1
-            indices[(i + j * (gridsize - 1)) * 6 + 1] = i + 1 + j * gridsize;                         //       |\   |
-            indices[(i + j * (gridsize - 1)) * 6 + 2] = i + 1 + (j + 1) * gridsize;                   //       |  \ |
-            indices[(i + j * (gridsize - 1)) * 6 + 3] = i + j * gridsize;                         //     5 +----+ 2, 4
+            indices[(i + j * (gridsize - 1)) * 6    ] = i + j * gridsize;                               //  0, 3 +----+ 1
+            indices[(i + j * (gridsize - 1)) * 6 + 1] = i + 1 + j * gridsize;                           //       |\   |
+            indices[(i + j * (gridsize - 1)) * 6 + 2] = i + 1 + (j + 1) * gridsize;                     //       |  \ |
+            indices[(i + j * (gridsize - 1)) * 6 + 3] = i + j * gridsize;                               //     5 +----+ 2, 4
             indices[(i + j * (gridsize - 1)) * 6 + 4] = i + 1 + (j + 1) * gridsize;
-            indices[(i + j * (gridsize - 1)) * 6 + 5] = i + (j + 1) * gridsize;
-            //std::cout << (i + j * (gridsize - 1)) * 6 + 5 << "\n";
+            indices[(i + j * (gridsize - 1)) * 6 + 5] = i + (j + 1) * gridsize;                         //       +-> i
+            //std::cout << (i + j * (gridsize - 1)) * 6 + 5 << "\n";                                    //       v   j
         }
     }/*
     for (int i = 0; i < (gridsize - 1) * (gridsize - 1); i++)
@@ -293,6 +223,82 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
 
     delete verts;
     delete indices;
+}
+
+void terrainFrame::makeShaders()
+{
+    resources.fragshader = makeShader(GL_FRAGMENT_SHADER, "f.glsl");
+    resources.vertshader = makeShader(GL_VERTEX_SHADER, "v.glsl");
+    resources.program = makeProgram(resources.vertshader, resources.fragshader);
+    resources.attribute.pos = glGetAttribLocation(resources.program, "pos");
+    resources.attribute.v_normal = glGetAttribLocation(resources.program, "v_normal");
+}
+
+
+terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
+{
+    //(*Initialize(terrainFrame)
+    wxMenuItem* MenuItem2;
+    wxMenuItem* MenuItem1;
+    wxMenu* Menu1;
+    wxBoxSizer* BoxSizer1;
+    wxMenuBar* MenuBar1;
+    wxMenu* Menu2;
+
+    Create(parent, id, _("Terrain!"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, _T("id"));
+    BoxSizer1 = new wxBoxSizer(wxHORIZONTAL);
+    int GLCanvasAttributes_1[] = {
+    	WX_GL_RGBA,
+    	WX_GL_DOUBLEBUFFER,
+    	WX_GL_DEPTH_SIZE,      16,
+    	WX_GL_STENCIL_SIZE,    0,
+    	0, 0 };
+    GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
+    GLCanvas1->SetMinSize(wxSize(640,640));
+    BoxSizer1->Add(GLCanvas1, 1, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    SetSizer(BoxSizer1);
+    MenuBar1 = new wxMenuBar();
+    Menu1 = new wxMenu();
+    MenuItem3 = new wxMenuItem(Menu1, ExportTGA, _("&Export TGA"), wxEmptyString, wxITEM_NORMAL);
+    Menu1->Append(MenuItem3);
+    MenuItem1 = new wxMenuItem(Menu1, idMenuQuit, _("Quit\tAlt-F4"), _("Quit the application"), wxITEM_NORMAL);
+    Menu1->Append(MenuItem1);
+    MenuBar1->Append(Menu1, _("&File"));
+    Menu2 = new wxMenu();
+    MenuItem2 = new wxMenuItem(Menu2, idMenuAbout, _("About\tF1"), _("Show info about this application"), wxITEM_NORMAL);
+    Menu2->Append(MenuItem2);
+    MenuBar1->Append(Menu2, _("Help"));
+    SetMenuBar(MenuBar1);
+    Timer1.SetOwner(this, ID_TIMER1);
+    Timer1.Start(10, false);
+    BoxSizer1->Fit(this);
+    BoxSizer1->SetSizeHints(this);
+
+    GLCanvas1->Connect(wxEVT_PAINT,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1Paint,0,this);
+    GLCanvas1->Connect(wxEVT_LEFT_DOWN,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1LeftDown,0,this);
+    GLCanvas1->Connect(wxEVT_LEFT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1LeftUp,0,this);
+    GLCanvas1->Connect(wxEVT_RIGHT_DOWN,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDown,0,this);
+    GLCanvas1->Connect(wxEVT_RIGHT_UP,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightUp,0,this);
+    GLCanvas1->Connect(wxEVT_RIGHT_DCLICK,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDClick,0,this);
+    GLCanvas1->Connect(wxEVT_MOTION,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseMove,0,this);
+    GLCanvas1->Connect(wxEVT_LEAVE_WINDOW,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseLeave,0,this);
+    Connect(ExportTGA,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnMenuItem3Selected);
+    Connect(idMenuQuit,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnQuit);
+    Connect(idMenuAbout,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnAbout);
+    Connect(ID_TIMER1,wxEVT_TIMER,(wxObjectEventFunction)&terrainFrame::OnTimer1Trigger);
+    //*)
+    GLContext  = new wxGLContext(GLCanvas1);
+
+    pitch = 0;
+    yaw = 0;
+    camx = 10;
+    camy = 20;
+    camz = -10;
+    lastmousex = 0;
+    lastmousey = 0;
+
+    generateTerrain();
+    makeShaders();
 
     //std::cout << sizeof(vert);
     std::cout << (gridsize - 1) * (gridsize - 1) * 2;
@@ -316,12 +322,12 @@ void terrainFrame::initgl()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    /*glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     glEnable(GL_COLOR_MATERIAL);
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+*/
     glViewport(0, 0, 640, 640);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -331,7 +337,7 @@ void terrainFrame::initgl()
     glTranslatef(-camx, -camy, -camz);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-
+/*
     GLfloat mat_specular[] = { 0.9, 0.9, 1.0, 1.0 };
     GLfloat mat_shininess[] = { 50.0 };
     GLfloat light_position[] = { 1.0, 1.0, 1.0, 0.0 };
@@ -343,7 +349,7 @@ void terrainFrame::initgl()
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
-    glEnable(GL_COLOR_MATERIAL);
+    glEnable(GL_COLOR_MATERIAL);*/
 
 }
 
@@ -357,22 +363,27 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     static int tick = 0;
     tick++;
     initgl();
-    glBegin(GL_POLYGON);
+    /*glBegin(GL_POLYGON);
     glColor3f(1, 1, 0.8);
-    glEnd();
+    glEnd();*/
+
+    glUseProgram(resources.program);
 
 
     glBindBuffer(GL_ARRAY_BUFFER, resources.VBO);
 
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_NORMAL_ARRAY);
-    glVertexPointer(3, GL_FLOAT, 32, BUFFER_OFFSET(0));
-    glNormalPointer(GL_FLOAT, 32, BUFFER_OFFSET(12));
+    glVertexAttribPointer(resources.attribute.pos, 3, GL_FLOAT, GL_FALSE, 32, BUFFER_OFFSET(0));
+    glEnableVertexAttribArray(resources.attribute.pos);
+    glVertexAttribPointer(resources.attribute.v_normal, 3, GL_FLOAT, GL_FALSE, 32, BUFFER_OFFSET(12));
+    glEnableVertexAttribArray(resources.attribute.v_normal);
+
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, resources.IBO);
 
     glDrawElements(GL_TRIANGLES, gridsize * gridsize * 6, GL_UNSIGNED_INT, BUFFER_OFFSET(0));
 
+    glDisableVertexAttribArray(resources.attribute.pos);
+    glDisableVertexAttribArray(resources.attribute.v_normal);
     endgl();
 }
 

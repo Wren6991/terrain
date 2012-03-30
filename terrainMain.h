@@ -17,7 +17,6 @@
 #include <wx/glcanvas.h>
 #include <wx/frame.h>
 #include <wx/timer.h>
-#include <wx/statusbr.h>
 //*)
 #define GL_GLEXT_PROTOTYPES
 
@@ -38,12 +37,28 @@ class terrainFrame: public wxFrame
         {
             GLuint VBO;
             GLuint IBO;
+            struct
+            {
+                GLuint pos;
+                GLuint v_normal;
+            } attribute;
+            struct
+            {
+                GLuint texcoord;
+                GLuint normal;
+            }varying;
+            GLuint fragshader;
+            GLuint vertshader;
+            GLuint program;
         } resources;
 
     private:
 
         void initgl();
         void endgl();
+
+        void generateTerrain();
+        void makeShaders();
 
         //(*Handlers(terrainFrame)
         void OnQuit(wxCommandEvent& event);
@@ -66,7 +81,6 @@ class terrainFrame: public wxFrame
         static const long ExportTGA;
         static const long idMenuQuit;
         static const long idMenuAbout;
-        static const long ID_STATUSBAR1;
         static const long ID_TIMER1;
         //*)
 
@@ -74,7 +88,6 @@ class terrainFrame: public wxFrame
         //(*Declarations(terrainFrame)
         wxGLCanvas* GLCanvas1;
         wxMenuItem* MenuItem3;
-        wxStatusBar* StatusBar1;
         wxTimer Timer1;
         //*)
 
