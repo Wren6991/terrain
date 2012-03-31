@@ -24,7 +24,7 @@
 
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
 
-int gridsize = 1000;
+int gridsize = 200;
 
 #define BUFFER_OFFSET(i) (reinterpret_cast<void*>(i))
 
@@ -152,7 +152,7 @@ void terrainFrame::generateTerrain()
     {
         for (int j = 0; j < gridsize; j++)
         {
-            normals[i][j] = vec3((grid[i + 2][j + 1] - grid[i][j + 1]) / 2, -1, (grid[i + 1][j + 2] - grid[i + 1][j]) / 2).normalise();
+            normals[i][j] = vec3(grid[i + 2][j + 1] - grid[i][j + 1], 2, grid[i + 1][j + 2] - grid[i + 1][j]);
         }
     }
 
@@ -232,6 +232,12 @@ void terrainFrame::makeShaders()
     resources.program = makeProgram(resources.vertshader, resources.fragshader);
     resources.attribute.pos = glGetAttribLocation(resources.program, "pos");
     resources.attribute.v_normal = glGetAttribLocation(resources.program, "v_normal");
+    resources.sandtexture = makeTexture("sand.tga");
+    resources.grasstexture = makeTexture("grass.tga");
+    resources.rocktexture = makeTexture("rock.tga");
+    resources.uniform.sand = glGetUniformLocation(resources.program, "sand");
+    resources.uniform.grass = glGetUniformLocation(resources.program, "grass");
+    resources.uniform.rock = glGetUniformLocation(resources.program, "rock");
 }
 
 
@@ -255,7 +261,7 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     	0, 0 };
     GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
     GLCanvas1->SetMinSize(wxSize(640,640));
-    BoxSizer1->Add(GLCanvas1, 1, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    BoxSizer1->Add(GLCanvas1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
     SetSizer(BoxSizer1);
     MenuBar1 = new wxMenuBar();
     Menu1 = new wxMenu();
@@ -322,6 +328,21 @@ void terrainFrame::initgl()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, resources.uniform.sand);
+    glUniform1i(resources.uniform.sand, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, resources.uniform.grass);
+    glUniform1i(resources.uniform.grass, 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, resources.uniform.rock);
+    glUniform1i(resources.uniform.rock, 2);
+
+
+
     /*glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     glEnable(GL_COLOR_MATERIAL);

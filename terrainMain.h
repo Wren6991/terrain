@@ -39,6 +39,12 @@ class terrainFrame: public wxFrame
             GLuint IBO;
             struct
             {
+                GLuint sand;
+                GLuint grass;
+                GLuint rock;
+            } uniform;
+            struct
+            {
                 GLuint pos;
                 GLuint v_normal;
             } attribute;
@@ -50,6 +56,9 @@ class terrainFrame: public wxFrame
             GLuint fragshader;
             GLuint vertshader;
             GLuint program;
+            GLuint sandtexture;
+            GLuint grasstexture;
+            GLuint rocktexture;
         } resources;
 
     private:
