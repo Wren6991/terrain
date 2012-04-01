@@ -203,7 +203,7 @@ GLuint makeTexture(const char* filename)
     glTexImage2D(
         GL_TEXTURE_2D, 0,          //target, level of detail
         GL_RGB8,                   //internal format
-        width, height, 0,          //width, height, border
+        t.width, t.height, 0,          //width, height, border
         GL_BGR, GL_UNSIGNED_BYTE,  //external format, type
         pixels                     //pixel data
     );

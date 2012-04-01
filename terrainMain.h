@@ -53,9 +53,20 @@ class terrainFrame: public wxFrame
                 GLuint texcoord;
                 GLuint normal;
             }varying;
-            GLuint fragshader;
-            GLuint vertshader;
-            GLuint program;
+            struct
+            {
+                GLuint fshader;
+                GLuint vshader;
+                GLuint program;
+                GLuint playerpos;
+            } terrain;
+            struct
+            {
+                GLuint fshader;
+                GLuint vshader;
+                GLuint program;
+                GLuint playerpos;
+            } water;
             GLuint sandtexture;
             GLuint grasstexture;
             GLuint rocktexture;

@@ -24,7 +24,7 @@
 
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
 
-int gridsize = 200;
+int gridsize = 300;
 
 #define BUFFER_OFFSET(i) (reinterpret_cast<void*>(i))
 
@@ -152,7 +152,11 @@ void terrainFrame::generateTerrain()
     {
         for (int j = 0; j < gridsize; j++)
         {
-            normals[i][j] = vec3(grid[i + 2][j + 1] - grid[i][j + 1], 2, grid[i + 1][j + 2] - grid[i + 1][j]);
+            normals[i][j] = vec3(
+                                 grid[i][j + 1] - grid[i + 2][j + 1],
+                                 2,
+                                 grid[i + 1][j] - grid[i + 1][j + 2]
+                                 );                                     //cross product of tangent vectors
         }
     }
 
@@ -197,15 +201,29 @@ void terrainFrame::generateTerrain()
     GLuint *indices = new GLuint[(gridsize - 1) * (gridsize - 1) * 6];
     for (int j = 0; j < (gridsize - 1); j++)
     {
+        bool flip = false;
         for (int i = 0; i < (gridsize - 1); i++)
         {
-            indices[(i + j * (gridsize - 1)) * 6    ] = i + j * gridsize;                               //  0, 3 +----+ 1
-            indices[(i + j * (gridsize - 1)) * 6 + 1] = i + 1 + j * gridsize;                           //       |\   |
-            indices[(i + j * (gridsize - 1)) * 6 + 2] = i + 1 + (j + 1) * gridsize;                     //       |  \ |
-            indices[(i + j * (gridsize - 1)) * 6 + 3] = i + j * gridsize;                               //     5 +----+ 2, 4
-            indices[(i + j * (gridsize - 1)) * 6 + 4] = i + 1 + (j + 1) * gridsize;
-            indices[(i + j * (gridsize - 1)) * 6 + 5] = i + (j + 1) * gridsize;                         //       +-> i
-            //std::cout << (i + j * (gridsize - 1)) * 6 + 5 << "\n";                                    //       v   j
+            if (flip)
+            {
+                indices[(i + j * (gridsize - 1)) * 6    ] = i + (j + 1) * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 1] = i + 1 + (j + 1) * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 2] = i + 1 + j * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 3] = i + (j + 1) * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 4] = i + 1 + j * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 5] = i + j * gridsize;
+            }
+            else
+            {
+                indices[(i + j * (gridsize - 1)) * 6    ] = i + j * gridsize;                               //  0, 3 +----+ 1
+                indices[(i + j * (gridsize - 1)) * 6 + 2] = i + 1 + j * gridsize;                           //       |\   |
+                indices[(i + j * (gridsize - 1)) * 6 + 1] = i + 1 + (j + 1) * gridsize;                     //       |  \ |
+                indices[(i + j * (gridsize - 1)) * 6 + 3] = i + j * gridsize;                               //     5 +----+ 2, 4
+                indices[(i + j * (gridsize - 1)) * 6 + 5] = i + 1 + (j + 1) * gridsize;
+                indices[(i + j * (gridsize - 1)) * 6 + 4] = i + (j + 1) * gridsize;                         //       +-> i
+                //std::cout << (i + j * (gridsize - 1)) * 6 + 5 << "\n";                                    //       v   j
+            }
+            flip = !flip;
         }
     }/*
     for (int i = 0; i < (gridsize - 1) * (gridsize - 1); i++)
@@ -227,17 +245,21 @@ void terrainFrame::generateTerrain()
 
 void terrainFrame::makeShaders()
 {
-    resources.fragshader = makeShader(GL_FRAGMENT_SHADER, "f.glsl");
-    resources.vertshader = makeShader(GL_VERTEX_SHADER, "v.glsl");
-    resources.program = makeProgram(resources.vertshader, resources.fragshader);
-    resources.attribute.pos = glGetAttribLocation(resources.program, "pos");
-    resources.attribute.v_normal = glGetAttribLocation(resources.program, "v_normal");
+    resources.terrain.fshader = makeShader(GL_FRAGMENT_SHADER, "terrain.f.glsl");
+    resources.terrain.vshader = makeShader(GL_VERTEX_SHADER, "terrain.v.glsl");
+    resources.terrain.program = makeProgram(resources.terrain.vshader, resources.terrain.fshader);
+    resources.attribute.pos = glGetAttribLocation(resources.terrainprogram, "pos");
+    resources.attribute.v_normal = glGetAttribLocation(resources.terrainprogram, "v_normal");
     resources.sandtexture = makeTexture("sand.tga");
+    resources.uniform.sand = glGetUniformLocation(resources.terrainprogram, "sand");
     resources.grasstexture = makeTexture("grass.tga");
+    resources.uniform.grass = glGetUniformLocation(resources.terrainprogram, "grass");
     resources.rocktexture = makeTexture("rock.tga");
-    resources.uniform.sand = glGetUniformLocation(resources.program, "sand");
-    resources.uniform.grass = glGetUniformLocation(resources.program, "grass");
-    resources.uniform.rock = glGetUniformLocation(resources.program, "rock");
+    resources.uniform.rock = glGetUniformLocation(resources.terrainprogram, "rock");
+    resources.water.fshader = makeShader(GL_FRAGMENT_SHADER, "water.f.glsl");
+    resources.water.vshader = makeShader(GL_VERTEX_SHADER, "water.v.glsl");
+    resources.water.program = makeProgram(resources.watervertshader, resources.waterfragshader);
+    resources.water.playerpos = glGetUniformLocation(resources.waterprogram, "playerpos");
 }
 
 
@@ -261,7 +283,7 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     	0, 0 };
     GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
     GLCanvas1->SetMinSize(wxSize(640,640));
-    BoxSizer1->Add(GLCanvas1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    BoxSizer1->Add(GLCanvas1, 1, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
     SetSizer(BoxSizer1);
     MenuBar1 = new wxMenuBar();
     Menu1 = new wxMenu();
@@ -328,27 +350,14 @@ void terrainFrame::initgl()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+    glEnable(GL_CULL_FACE);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, resources.uniform.sand);
-    glUniform1i(resources.uniform.sand, 0);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, resources.uniform.grass);
-    glUniform1i(resources.uniform.grass, 1);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, resources.uniform.rock);
-    glUniform1i(resources.uniform.rock, 2);
-
-
-
-    /*glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
     glEnable(GL_COLOR_MATERIAL);
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-*/
+
     glViewport(0, 0, 640, 640);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -388,7 +397,19 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     glColor3f(1, 1, 0.8);
     glEnd();*/
 
-    glUseProgram(resources.program);
+    glUseProgram(resources.terrain.program);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, resources.sandtexture);
+    glUniform1i(resources.uniform.sand, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, resources.grasstexture);
+    glUniform1i(resources.uniform.grass, 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, resources.rocktexture);
+    glUniform1i(resources.uniform.rock, 2);
 
 
     glBindBuffer(GL_ARRAY_BUFFER, resources.VBO);
@@ -405,6 +426,21 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
 
     glDisableVertexAttribArray(resources.attribute.pos);
     glDisableVertexAttribArray(resources.attribute.v_normal);
+
+    glFlush();
+
+    glUseProgram(resources.water.program);
+
+
+     glUniform3f(resources.water.playerpos, camx, camy, camz);
+
+    glBegin(GL_POLYGON);
+    glColor4f(0, 0, 0.8, 0.7);
+    glVertex3f(0, 5, 0);
+    glVertex3f(0, 5 ,gridsize);
+    glVertex3f(gridsize, 5, gridsize);
+    glVertex3f(gridsize, 5, 0);
+    glEnd();
     endgl();
 }
 
