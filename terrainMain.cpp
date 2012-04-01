@@ -6,7 +6,10 @@
  * Copyright: Luke Wren ()
  * License:
  **************************************************************/
-
+// Todo:
+// chunking/LOD
+// shadows
+// sky
 #define GL_GLEXT_PROTOTYPES
 #include "terrainMain.h"
 #include <wx/msgdlg.h>
@@ -261,6 +264,7 @@ void terrainFrame::makeShaders()
     resources.water.vshader = makeShader(GL_VERTEX_SHADER, "water.v.glsl");
     resources.water.program = makeProgram(resources.water.vshader, resources.water.fshader);
     resources.water.playerpos = glGetUniformLocation(resources.water.program, "playerpos");
+    resources.water.time = glGetUniformLocation(resources.water.program, "time");
 }
 
 
@@ -435,6 +439,7 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     glUseProgram(resources.water.program);
 
     glUniform3f(resources.water.playerpos, camx, camy, camz);
+    glUniform1f(resources.water.time, tick * 0.01f);
 
     glBegin(GL_POLYGON);
     glColor4f(0, 0, 0.8, 0.7);

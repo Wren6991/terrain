@@ -66,6 +66,7 @@ class terrainFrame: public wxFrame
                 GLuint vshader;
                 GLuint program;
                 GLuint playerpos;
+                GLuint time;
             } water;
             GLuint sandtexture;
             GLuint grasstexture;
