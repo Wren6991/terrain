@@ -3,9 +3,7 @@
 varying vec3 pos;
 uniform vec3 playerpos;
 uniform float time;
-
-const vec3 lightdir = normalize(vec3(0, 1, 0));
-
+uniform vec3 lightdir;
 
 void main()
 {

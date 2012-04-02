@@ -5,11 +5,11 @@ uniform sampler2D sand;
 uniform sampler2D grass;
 
 uniform vec3 playerpos;
+uniform vec3 lightdir;
 
 varying vec3 normal;
 varying vec3 pos;
 
-const vec3 lightdir = normalize(vec3(0, 1, 0));
 const vec3 ambient = vec3(0.3, 0.3, 0.4);
 const vec3 diffuse = vec3(1.0, 0.95, 0.9);
 

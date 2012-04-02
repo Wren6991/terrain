@@ -59,6 +59,7 @@ class terrainFrame: public wxFrame
                 GLuint vshader;
                 GLuint program;
                 GLuint playerpos;
+                GLuint lightdir;
             } terrain;
             struct
             {
@@ -67,6 +68,7 @@ class terrainFrame: public wxFrame
                 GLuint program;
                 GLuint playerpos;
                 GLuint time;
+                GLuint lightdir;
             } water;
             GLuint sandtexture;
             GLuint grasstexture;

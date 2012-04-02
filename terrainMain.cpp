@@ -252,6 +252,7 @@ void terrainFrame::makeShaders()
     resources.terrain.vshader = makeShader(GL_VERTEX_SHADER, "terrain.v.glsl");
     resources.terrain.program = makeProgram(resources.terrain.vshader, resources.terrain.fshader);
     resources.terrain.playerpos = glGetUniformLocation(resources.terrain.program, "playerpos");
+    resources.terrain.lightdir = glGetUniformLocation(resources.terrain.program, "lightdir");
     resources.attribute.pos = glGetAttribLocation(resources.terrain.program, "v_pos");
     resources.attribute.v_normal = glGetAttribLocation(resources.terrain.program, "v_normal");
     resources.sandtexture = makeTexture("sand.tga");
@@ -265,6 +266,7 @@ void terrainFrame::makeShaders()
     resources.water.program = makeProgram(resources.water.vshader, resources.water.fshader);
     resources.water.playerpos = glGetUniformLocation(resources.water.program, "playerpos");
     resources.water.time = glGetUniformLocation(resources.water.program, "time");
+    resources.water.lightdir = glGetUniformLocation(resources.water.program, "lightdir");
 }
 
 
@@ -405,6 +407,7 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     glUseProgram(resources.terrain.program);
 
     glUniform3f(resources.terrain.playerpos, camx, camy, camz);
+    glUniform3f(resources.terrain.lightdir, -0.57735, 0.57735, -0.57735);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, resources.sandtexture);
@@ -440,6 +443,7 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
 
     glUniform3f(resources.water.playerpos, camx, camy, camz);
     glUniform1f(resources.water.time, tick * 0.01f);
+    glUniform3f(resources.water.lightdir, -0.57735, 0.57735, -0.57735);
 
     glBegin(GL_POLYGON);
     glColor4f(0, 0, 0.8, 0.7);
