@@ -13,8 +13,10 @@
 #include <GL/glew.h>
 //(*Headers(terrainFrame)
 #include <wx/sizer.h>
+#include <wx/stattext.h>
 #include <wx/menu.h>
 #include <wx/glcanvas.h>
+#include <wx/slider.h>
 #include <wx/frame.h>
 #include <wx/timer.h>
 //*)
@@ -58,8 +60,21 @@ class terrainFrame: public wxFrame
                 GLuint fshader;
                 GLuint vshader;
                 GLuint program;
+                GLuint pos;
+                GLuint FBO;
+                GLuint colortexture;
+                GLuint depthtexture;
+
+            } shadow;
+            struct
+            {
+                GLuint fshader;
+                GLuint vshader;
+                GLuint program;
                 GLuint playerpos;
                 GLuint lightdir;
+                GLuint lightmatrix;
+                GLuint shadowmap;
             } terrain;
             struct
             {
@@ -74,13 +89,15 @@ class terrainFrame: public wxFrame
             GLuint grasstexture;
             GLuint rocktexture;
         } resources;
-
+        float lightdirx, lightdiry, lightdirz;
+        int screenwidth, screenheight;
     private:
 
         void initgl();
         void endgl();
 
         void generateTerrain();
+        void renderShadows();
         void makeShaders();
 
         //(*Handlers(terrainFrame)
@@ -97,10 +114,17 @@ class terrainFrame: public wxFrame
         void OnGLCanvas1RightUp(wxMouseEvent& event);
         void OnGLCanvas1RightDClick(wxMouseEvent& event);
         void OnMenuItem3Selected(wxCommandEvent& event);
+        void OnSliderLdirxCmdScrollChanged(wxScrollEvent& event);
+        void OnSliderLdirzCmdScrollChanged(wxScrollEvent& event);
+        void OnGLCanvas1Resize(wxSizeEvent& event);
         //*)
 
         //(*Identifiers(terrainFrame)
         static const long ID_GLCANVAS1;
+        static const long ID_STATICTEXT1;
+        static const long ID_SLIDER1;
+        static const long ID_SLIDER2;
+        static const long ID_SLIDER3;
         static const long ExportTGA;
         static const long idMenuQuit;
         static const long idMenuAbout;
@@ -109,8 +133,12 @@ class terrainFrame: public wxFrame
 
         wxGLContext *GLContext;
         //(*Declarations(terrainFrame)
+        wxSlider* SliderLdirz;
         wxGLCanvas* GLCanvas1;
+        wxStaticText* StaticText1;
         wxMenuItem* MenuItem3;
+        wxSlider* SliderLdiry;
+        wxSlider* SliderLdirx;
         wxTimer Timer1;
         //*)
 

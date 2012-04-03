@@ -21,6 +21,7 @@
 #include <istream>
 
 //(*InternalHeaders(terrainFrame)
+#include <wx/settings.h>
 #include <wx/intl.h>
 #include <wx/string.h>
 //*)
@@ -28,6 +29,8 @@
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679;
 
 int gridsize = 300;
+
+int shadowsize = 1024;
 
 #define BUFFER_OFFSET(i) (reinterpret_cast<void*>(i))
 
@@ -60,6 +63,10 @@ wxString wxbuildinfo(wxbuildinfoformat format)
 
 //(*IdInit(terrainFrame)
 const long terrainFrame::ID_GLCANVAS1 = wxNewId();
+const long terrainFrame::ID_STATICTEXT1 = wxNewId();
+const long terrainFrame::ID_SLIDER1 = wxNewId();
+const long terrainFrame::ID_SLIDER2 = wxNewId();
+const long terrainFrame::ID_SLIDER3 = wxNewId();
 const long terrainFrame::ExportTGA = wxNewId();
 const long terrainFrame::idMenuQuit = wxNewId();
 const long terrainFrame::idMenuAbout = wxNewId();
@@ -248,11 +255,49 @@ void terrainFrame::generateTerrain()
 
 void terrainFrame::makeShaders()
 {
+    resources.shadow.fshader = makeShader(GL_FRAGMENT_SHADER, "shadow.f.glsl");
+    resources.shadow.vshader = makeShader(GL_VERTEX_SHADER, "shadow.v.glsl");
+    resources.shadow.program = makeProgram(resources.shadow.vshader, resources.shadow.fshader);
+    resources.shadow.pos = glGetAttribLocation(resources.shadow.program, "pos");
+    glGenFramebuffers(1, &resources.shadow.FBO);
+
+    glGenTextures(1, &resources.shadow.colortexture);
+    glBindTexture(GL_TEXTURE_2D, resources.shadow.colortexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, shadowsize, shadowsize, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+
+    glGenTextures(1, &resources.shadow.depthtexture);
+    glBindTexture(GL_TEXTURE_2D, resources.shadow.depthtexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadowsize, shadowsize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, resources.shadow.FBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resources.shadow.colortexture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, resources.shadow.depthtexture, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        std::cout << "Couldn't create shadow buffer\n";
+        return;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     resources.terrain.fshader = makeShader(GL_FRAGMENT_SHADER, "terrain.f.glsl");
     resources.terrain.vshader = makeShader(GL_VERTEX_SHADER, "terrain.v.glsl");
     resources.terrain.program = makeProgram(resources.terrain.vshader, resources.terrain.fshader);
     resources.terrain.playerpos = glGetUniformLocation(resources.terrain.program, "playerpos");
     resources.terrain.lightdir = glGetUniformLocation(resources.terrain.program, "lightdir");
+    resources.terrain.lightmatrix = glGetUniformLocation(resources.terrain.program, "lightmatrix");
+    resources.terrain.shadowmap = glGetUniformLocation(resources.terrain.program, "shadowmap");
+
     resources.attribute.pos = glGetAttribLocation(resources.terrain.program, "v_pos");
     resources.attribute.v_normal = glGetAttribLocation(resources.terrain.program, "v_normal");
     resources.sandtexture = makeTexture("sand.tga");
@@ -261,6 +306,7 @@ void terrainFrame::makeShaders()
     resources.uniform.grass = glGetUniformLocation(resources.terrain.program, "grass");
     resources.rocktexture = makeTexture("rock.tga");
     resources.uniform.rock = glGetUniformLocation(resources.terrain.program, "rock");
+
     resources.water.fshader = makeShader(GL_FRAGMENT_SHADER, "water.f.glsl");
     resources.water.vshader = makeShader(GL_VERTEX_SHADER, "water.v.glsl");
     resources.water.program = makeProgram(resources.water.vshader, resources.water.fshader);
@@ -275,12 +321,14 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     //(*Initialize(terrainFrame)
     wxMenuItem* MenuItem2;
     wxMenuItem* MenuItem1;
+    wxBoxSizer* BoxSizer2;
     wxMenu* Menu1;
     wxBoxSizer* BoxSizer1;
     wxMenuBar* MenuBar1;
     wxMenu* Menu2;
 
     Create(parent, id, _("Terrain!"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, _T("id"));
+    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
     BoxSizer1 = new wxBoxSizer(wxHORIZONTAL);
     int GLCanvasAttributes_1[] = {
     	WX_GL_RGBA,
@@ -290,7 +338,17 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     	0, 0 };
     GLCanvas1 = new wxGLCanvas(this, ID_GLCANVAS1, wxDefaultPosition, wxDefaultSize, 0, _T("ID_GLCANVAS1"), GLCanvasAttributes_1);
     GLCanvas1->SetMinSize(wxSize(640,640));
-    BoxSizer1->Add(GLCanvas1, 1, wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    BoxSizer1->Add(GLCanvas1, 3, wxEXPAND|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    BoxSizer2 = new wxBoxSizer(wxVERTICAL);
+    StaticText1 = new wxStaticText(this, ID_STATICTEXT1, _("Light Direction"), wxDefaultPosition, wxDefaultSize, 0, _T("ID_STATICTEXT1"));
+    BoxSizer2->Add(StaticText1, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    SliderLdirx = new wxSlider(this, ID_SLIDER1, -10, -10, 10, wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_SLIDER1"));
+    BoxSizer2->Add(SliderLdirx, 1, wxALL|wxEXPAND|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    SliderLdiry = new wxSlider(this, ID_SLIDER2, 10, -10, 10, wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_SLIDER2"));
+    BoxSizer2->Add(SliderLdiry, 1, wxALL|wxEXPAND|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    SliderLdirz = new wxSlider(this, ID_SLIDER3, -10, -10, 10, wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_SLIDER3"));
+    BoxSizer2->Add(SliderLdirz, 1, wxALL|wxEXPAND|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
+    BoxSizer1->Add(BoxSizer2, 1, wxALL|wxALIGN_CENTER_HORIZONTAL|wxALIGN_CENTER_VERTICAL, 5);
     SetSizer(BoxSizer1);
     MenuBar1 = new wxMenuBar();
     Menu1 = new wxMenu();
@@ -317,6 +375,10 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     GLCanvas1->Connect(wxEVT_RIGHT_DCLICK,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1RightDClick,0,this);
     GLCanvas1->Connect(wxEVT_MOTION,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseMove,0,this);
     GLCanvas1->Connect(wxEVT_LEAVE_WINDOW,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1MouseLeave,0,this);
+    GLCanvas1->Connect(wxEVT_SIZE,(wxObjectEventFunction)&terrainFrame::OnGLCanvas1Resize,0,this);
+    Connect(ID_SLIDER1,wxEVT_SCROLL_THUMBTRACK,(wxObjectEventFunction)&terrainFrame::OnSliderLdirxCmdScrollChanged);
+    Connect(ID_SLIDER2,wxEVT_SCROLL_THUMBTRACK,(wxObjectEventFunction)&terrainFrame::OnSliderLdirxCmdScrollChanged);
+    Connect(ID_SLIDER3,wxEVT_SCROLL_THUMBTRACK,(wxObjectEventFunction)&terrainFrame::OnSliderLdirxCmdScrollChanged);
     Connect(ExportTGA,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnMenuItem3Selected);
     Connect(idMenuQuit,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnQuit);
     Connect(idMenuAbout,wxEVT_COMMAND_MENU_SELECTED,(wxObjectEventFunction)&terrainFrame::OnAbout);
@@ -325,12 +387,21 @@ terrainFrame::terrainFrame(wxWindow* parent,wxWindowID id)
     GLContext  = new wxGLContext(GLCanvas1);
 
     pitch = 0;
-    yaw = 0;
+    yaw = -1*PI;
     camx = 10;
     camy = 20;
     camz = -10;
     lastmousex = 0;
     lastmousey = 0;
+    lightdirx = -1;
+    lightdiry = 1;
+    lightdirz = -1;
+    float length = sqrt(lightdirx * lightdirx + lightdiry * lightdiry + lightdirz * lightdirz);
+    lightdirx /= length;
+    lightdiry /= length;
+    lightdirz /= length;
+    screenwidth = 640;
+    screenheight = 640;
 
     generateTerrain();
     makeShaders();
@@ -365,15 +436,7 @@ void terrainFrame::initgl()
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glViewport(0, 0, 640, 640);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(-1, 1, -1, 1, 1, 1000);
-    glRotatef(pitch * 180 / PI, 1, 0, 0);
-    glRotatef(-yaw * 180 / PI, 0, 1, 0);
-    glTranslatef(-camx, -camy, -camz);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    glViewport(0, 0, screenwidth, screenheight);
 /*
     GLfloat mat_specular[] = { 0.9, 0.9, 1.0, 1.0 };
     GLfloat mat_shininess[] = { 50.0 };
@@ -390,6 +453,40 @@ void terrainFrame::initgl()
 
 }
 
+void terrainFrame::renderShadows()
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, resources.shadow.FBO);
+    glPushAttrib(GL_VIEWPORT_BIT | GL_ENABLE_BIT);
+    glViewport(0, 0, shadowsize, shadowsize);
+    glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+    glDisable(GL_CULL_FACE);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glScalef(2.f/gridsize / sqrtf(2), 2.f/gridsize / sqrtf(2), 2.f/gridsize / sqrtf(2));
+    glOrtho(-1, 1, -1, 1, 1, 3);
+    glRotatef(atan2(lightdiry, sqrt(lightdirx * lightdirx + lightdirz * lightdirz)) * 180 / PI, 1, 0, 0);
+    glRotatef(-atan2(lightdirx, lightdirz) * 180 / PI, 0, 1, 0);
+    glTranslatef(-gridsize * 0.5f, 0, -gridsize * 0.5f);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glUseProgram(resources.shadow.program);
+    glBindBuffer(GL_ARRAY_BUFFER, resources.VBO);
+
+    glVertexAttribPointer(resources.shadow.pos, 3, GL_FLOAT, GL_FALSE, 32, BUFFER_OFFSET(0));
+    glEnableVertexAttribArray(resources.shadow.pos);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, resources.IBO);
+    glDrawElements(GL_TRIANGLES, (gridsize - 1) * (gridsize - 1) * 6, GL_UNSIGNED_INT, BUFFER_OFFSET(0));
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glPopAttrib();
+}
+
 void terrainFrame::endgl()
 {
     glFlush();
@@ -400,14 +497,32 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     static int tick = 0;
     tick++;
     initgl();
-    /*glBegin(GL_POLYGON);
-    glColor3f(1, 1, 0.8);
-    glEnd();*/
+
+    renderShadows();
+
+
+    float lightmatrix[16];
+    glGetFloatv(GL_PROJECTION_MATRIX, lightmatrix);
+    /*for (int i = 0; i < 16; i++)
+    {
+        std::cout << lightmatrix[i] << " ";
+        if ((i + 1) % 4 == 0)
+            std::cout << "\n";
+    }
+    std::cout << "\n";*/
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glFrustum(-1, 1, -1, 1, 1, 1000);
+    glRotatef(pitch * 180 / PI, 1, 0, 0);
+    glRotatef(-yaw * 180 / PI, 0, 1, 0);
+    glTranslatef(-camx, -camy, -camz);
 
     glUseProgram(resources.terrain.program);
 
     glUniform3f(resources.terrain.playerpos, camx, camy, camz);
-    glUniform3f(resources.terrain.lightdir, -0.57735, 0.57735, -0.57735);
+    glUniform3f(resources.terrain.lightdir, lightdirx, lightdiry, lightdirz);
+    glUniformMatrix4fv(resources.terrain.lightmatrix, 1, GL_FALSE, lightmatrix);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, resources.sandtexture);
@@ -421,6 +536,10 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
     glBindTexture(GL_TEXTURE_2D, resources.rocktexture);
     glUniform1i(resources.uniform.rock, 2);
 
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, resources.shadow.colortexture);
+    glUniform1i(resources.terrain.shadowmap, 3);
+
 
     glBindBuffer(GL_ARRAY_BUFFER, resources.VBO);
 
@@ -432,26 +551,28 @@ void terrainFrame::OnGLCanvas1Paint(wxPaintEvent& event)
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, resources.IBO);
 
-    glDrawElements(GL_TRIANGLES, gridsize * gridsize * 6, GL_UNSIGNED_INT, BUFFER_OFFSET(0));
+    glDrawElements(GL_TRIANGLES, (gridsize - 1) * (gridsize - 1) * 6, GL_UNSIGNED_INT, BUFFER_OFFSET(0));
 
     glDisableVertexAttribArray(resources.attribute.pos);
     glDisableVertexAttribArray(resources.attribute.v_normal);
 
     glFlush();
 
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     glUseProgram(resources.water.program);
 
     glUniform3f(resources.water.playerpos, camx, camy, camz);
     glUniform1f(resources.water.time, tick * 0.01f);
-    glUniform3f(resources.water.lightdir, -0.57735, 0.57735, -0.57735);
+    glUniform3f(resources.water.lightdir, lightdirx, lightdiry, lightdirz);
 
-    glBegin(GL_POLYGON);
+    /*glBegin(GL_POLYGON);
     glColor4f(0, 0, 0.8, 0.7);
     glVertex3f(0, 5, 0);
     glVertex3f(0, 5 ,gridsize);
     glVertex3f(gridsize, 5, gridsize);
     glVertex3f(gridsize, 5, 0);
-    glEnd();
+    glEnd();*/
     endgl();
 }
 
@@ -567,4 +688,24 @@ void terrainFrame::OnMenuItem3Selected(wxCommandEvent& event)
     ofile << std::flush;
     ofile.close();
     wxMessageBox("LOL", _("Welcome to..."));
+}
+
+void terrainFrame::OnSliderLdirxCmdScrollChanged(wxScrollEvent& event)
+{
+    lightdirx = SliderLdirx->GetValue() * 0.1f;
+    lightdiry = SliderLdiry->GetValue() * 0.1f;
+    lightdirz = SliderLdirz->GetValue() * 0.1f;
+    float length = sqrt(lightdirx * lightdirx + lightdiry * lightdiry + lightdirz * lightdirz);
+    lightdirx /= length;
+    lightdiry /= length;
+    lightdirz /= length;
+}
+
+
+void terrainFrame::OnGLCanvas1Resize(wxSizeEvent& event)
+{
+    screenwidth = event.GetSize().GetWidth();
+    screenheight = event.GetSize().GetHeight();
+    if (screenheight < screenwidth)
+        screenheight = screenwidth;
 }
